@@ -1,0 +1,110 @@
+---
+# JPS Secrets
+
+# SSH credentials for server connection(s)
+# If used, this will be copied into each reference of `*ssh` in the below objects
+ssh: &ssh
+  username: 
+  password: 
+  port: 22
+  ssh_key: null
+  look_for_keys: true
+  timeout: 10
+
+# Jamf Pro Environment Details
+Environments:
+
+  - name: Production
+
+    # Primary JPS
+    Primary:
+      hostname: jps-primary.server.org
+      ip: "10.1.0.1"
+      ssh: *ssh
+
+    # Secondary JPS(s)
+    Secondary:
+      - hostname: jps-2.server.org
+        ip: "10.1.0.2"
+        ssh: *ssh
+      - hostname: jps-3.server.org
+        ip: "10.1.0.3"
+        ssh: *ssh
+
+    # MySQL database details
+    Database:
+      hostname: jps-database.server.org
+      ip: "10.1.0.4"
+      use_ssh: true
+      allow_agent: false
+      database:
+        port: 3306
+        name: jamfsoftware
+        username: 
+        password: 
+        timeout: 10
+      ssh: *ssh
+
+# Development Environment
+  - name: Development
+
+    # Primary JPS
+    Primary:
+      hostname: jps-dev-primary.server.org
+      ip: "10.2.0.1"
+      ssh: *ssh
+
+    # Secondary JPS(s)
+    Secondary:
+      - hostname: jps-dev-2.server.org
+        ip: "10.2.0.2"
+        ssh: *ssh
+      - hostname: jps-dev-3.server.org
+        ip: "10.2.0.3"
+        ssh: *ssh
+
+    # MySQL database details
+    Database:
+      hostname: jps-dev-database.server.org
+      ip: "10.2.0.4"
+      use_ssh: true
+      allow_agent: false
+      database:
+        port: 3306
+        name: jamfsoftware
+        username: 
+        password: 
+        timeout: 10
+      ssh: *ssh
+
+# Test Environment
+  - name: Test
+
+    # Primary JPS
+    Primary:
+      hostname: jps-test-primary.server.org
+      ip: "10.3.0.1"
+      ssh: *ssh
+
+    # Secondary JPS(s)
+    Secondary:
+      - hostname: jps-test-2.server.org
+        ip: "10.3.0.2"
+        ssh: *ssh
+      - hostname: jps-test-3.server.org
+        ip: "10.3.0.3"
+        ssh: *ssh
+
+    # MySQL database details
+    Database:
+      hostname: jps-test-database.server.org
+      ip: "10.3.0.4"
+      use_ssh: true
+      allow_agent: false
+      database:
+        port: 3306
+        name: jamfsoftware
+        username: 
+        password: 
+        timeout: 10
+      ssh: *ssh
