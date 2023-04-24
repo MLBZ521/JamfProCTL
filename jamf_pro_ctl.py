@@ -12,7 +12,7 @@ import re
 # For Type Hinting
 import io
 from pathlib import PurePath
-from typing import Iterable, Union, Optional
+from typing import Iterable, Optional, Union
 PathTypes = Union[str, bytes, PurePath]
 
 import jasypt4py
@@ -30,8 +30,9 @@ from pydantic import BaseModel
 
 
 __about__ = "https://github.com/MLBZ521/JamfProCTL"
-__updated__ = "4/21/2023"
-__version__ = "1.0.0"
+__created__ = "4/21/2023"
+__updated__ = "4/24/2023"
+__version__ = "1.0.1"
 
 
 class MySQLClient():
@@ -207,7 +208,7 @@ class MySQLClient():
 				self.tunnel.restart()
 
 		if not self.db_connection or not self.db_cursor:
-			self.__verbose__("Database connect not established")
+			self.__verbose__("Database connection not established")
 			self.init_database()
 
 		if not self.db_connection.is_connected():
@@ -577,6 +578,9 @@ class Environment(BaseModel):
 
 
 class TextFormat:
+	"""Simple class that can be used to modified text.
+	For example, when printing to console/terminal.
+	"""
 	purple = '\033[95m'
 	cyan = '\033[96m'
 	dark_cyan = '\033[36m'
@@ -596,6 +600,7 @@ class JamfProCTLError(Exception):
 		stdout (str):  stdout from the executed command.
 		stderr (str):  stderr from the executed command.
 		exit_status (int):  exit code from the executed command.
+		supplemental_msg (str):  Info on what failed to be included with message.
 	"""
 
 	def __init__(self, stdout: str, stderr: str, exit_status: int, supplemental_msg: str = ""):
@@ -614,6 +619,7 @@ class DatabaseBackupError(Exception):
 		stdout (str):  stdout from the executed command.
 		stderr (str):  stderr from the executed command.
 		exit_status (int):  exit code from the executed command.
+		supplemental_msg (str):  Info on what failed to be included with message.
 	"""
 
 	def __init__(
@@ -874,7 +880,7 @@ class JamfProCTL():
 	def download(
 		self,
 		file: PathTypes | Iterable[PathTypes],
-		server: Optional(str | App_Server | DB_Server),
+		server: Optional(str | App_Server | DB_Server) = None,
 		local_path: PathTypes = "~/Downloads",
 		**kwargs
 	):
@@ -901,7 +907,7 @@ class JamfProCTL():
 	def upload(
 		self,
 		file: PathTypes | Iterable[PathTypes],
-		server: Optional(str | App_Server | DB_Server),
+		server: Optional(str | App_Server | DB_Server) = None,
 		remote_path: PathTypes = ".",
 		**kwargs
 	):
@@ -923,7 +929,11 @@ class JamfProCTL():
 
 	@__which_server
 	def execute(
-		self, cmd: str, server: Optional(str | App_Server | DB_Server), close_ssh: bool = True):
+		self,
+		cmd: str,
+		server: Optional(str | App_Server | DB_Server) = None,
+		close_ssh: bool = True
+	):
 		"""Convenience function that maps to the server objects nested execute_cmd method.
 
 		Args:
@@ -948,7 +958,7 @@ class JamfProCTL():
 
 
 	@__which_server
-	def start(self, server: Optional(str | App_Server | DB_Server), close_ssh: bool = True):
+	def start(self, server: Optional(str | App_Server | DB_Server) = None, close_ssh: bool = True):
 		"""Convenience function that starts the Jamf Pro Server Application.
 
 		Args:
@@ -964,7 +974,7 @@ class JamfProCTL():
 
 
 	@__which_server
-	def stop(self, server: Optional(str | App_Server | DB_Server), close_ssh: bool = True):
+	def stop(self, server: Optional(str | App_Server | DB_Server) = None, close_ssh: bool = True):
 		"""Convenience function that stops the Jamf Pro Server Application.
 
 		Args:
@@ -982,7 +992,8 @@ class JamfProCTL():
 
 
 	@__which_server
-	def restart(self, server: Optional(str | App_Server | DB_Server), close_ssh: bool = True):
+	def restart(
+		self, server: Optional(str | App_Server | DB_Server) = None, close_ssh: bool = True):
 		"""Convenience function that restarts the Jamf Pro Server Application.
 
 		Args:
@@ -1025,7 +1036,11 @@ class JamfProCTL():
 
 	@__which_server
 	def install_jamf_pro(
-		self, server: Optional(str | App_Server | DB_Server), installer="jamf-pro-installer-linux-*", close_ssh: bool = True):
+		self,
+		server: Optional(str | App_Server | DB_Server) = None,
+		installer: str = "jamf-pro-installer-linux-*",
+		close_ssh: bool = True
+	):
 		"""Convenience function that installs an previously uploaded Jamf Pro Server installer.
 
 		Notes:
