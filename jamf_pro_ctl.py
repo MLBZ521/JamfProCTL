@@ -31,8 +31,8 @@ from pydantic import BaseModel
 
 __about__ = "https://github.com/MLBZ521/JamfProCTL"
 __created__ = "4/21/2023"
-__updated__ = "4/24/2023"
-__version__ = "1.0.1"
+__updated__ = "4/25/2023"
+__version__ = "1.1.0"
 
 
 class MySQLClient():
@@ -546,6 +546,13 @@ class DatabaseConfig(BaseModel):
 	timeout: int = 10  # parameter for mysql.connector.MySQLConnection
 
 
+class JamfProAPI(BaseModel):
+	"""Jamf Pro API Credentials Model"""
+	username: str
+	password: str
+	url: str
+
+
 class App_Server(BaseModel):
 	"""JPS App Server Model"""
 	hostname: str
@@ -567,6 +574,7 @@ class DB_Server(App_Server):
 class Instance(BaseModel):
 	"""JPS Instance Model"""
 	name: str
+	api: JamfProAPI
 	Primary: App_Server
 	Secondary: Optional[list[App_Server]]
 	Database: DB_Server
