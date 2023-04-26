@@ -15,6 +15,11 @@ ssh: &ssh
 Environments:
 
   - name: Production
+    # API Credentials
+    api:
+      url:  https://jps-primary.server.org:8443
+      username: 
+      password: 
 
     # Primary JPS
     Primary:
@@ -47,6 +52,11 @@ Environments:
 
 # Development Environment
   - name: Development
+    # API Credentials
+    api:
+      url:  https://jps-dev-2.server.org:8443
+      username: 
+      password: 
 
     # Primary JPS
     Primary:
