@@ -31,8 +31,8 @@ from pydantic import BaseModel
 
 __about__ = "https://github.com/MLBZ521/JamfProCTL"
 __created__ = "4/21/2023"
-__updated__ = "4/25/2023"
-__version__ = "1.1.0"
+__updated__ = "4/26/2023"
+__version__ = "1.2.0"
 
 
 class MySQLClient():
@@ -489,14 +489,19 @@ class SSHClient():
 				(Otherwise it would be overwritten.)
 		"""
 
-		local_file = f"{os.path.expanduser(local_path)}/{os.path.basename(file)}"
+		if isinstance(file, str):
+			file = [file]
 
-		if os.path.exists(local_file):
-			raise FileExistsError(f"[WARNING] A file with this name already exists:  {local_file}")
+		for _file in file:
 
-		with scp.SCPClient(self.client.get_transport(), progress=self.__scp_progress) as _scp:
-			_scp.get(file, local_file)
-			self.__verbose__("\nDownload(s) complete!")
+			local_file = f"{os.path.expanduser(local_path)}/{os.path.basename(_file)}"
+
+			if os.path.exists(local_file):
+				raise FileExistsError(f"[WARNING] A file with this name already exists:  {local_file}")
+
+			with scp.SCPClient(self.client.get_transport(), progress=self.__scp_progress) as _scp:
+				_scp.get(_file, local_file)
+				self.__verbose__("\nDownload(s) complete!")
 
 
 	@__start_ssh
@@ -933,6 +938,63 @@ class JamfProCTL():
 		"""
 
 		return self.server.ssh.client.upload(file=file, remote_path=remote_path)
+
+
+	@__which_server
+	def get_logs(
+		self,
+		log_type: Literal("all", "Access", "ChangeManagement", "SoftwareServer") = "SoftwareServer",
+		which: Literal("all", "latest") = "latest",
+		server: Optional(str | App_Server | DB_Server) = None,
+		local_path: PathTypes = "~/Downloads",
+		**kwargs
+	):
+		"""Convenience function to download Jamf Pro logs.
+
+		Args:
+			log_type (str, optional):  The log type to download.
+				Options are:  "all", "Access", "ChangeManagement", "SoftwareServer"
+				Defaults to "SoftwareServer".
+			which (str, optional): Download either the "latest" or "all"
+				logs of the log_type requested.
+			 	Defaults to "latest".
+			local_path (str, optional):  Local path to download file(s) too.
+				Defaults to "~/Downloads".
+			server (str | App_Server | DB_Server, optional):  Optionally provide a
+				server to run function against.
+
+		Raises:
+			FileExistsError:  If a local file of the same name already exists.
+				(Otherwise it would be overwritten.)
+		"""
+
+		def list_logs(filter: str = None):
+
+			all_logs = self.execute(
+				cmd="ls /usr/local/jss/logs/", server=self.server, close_ssh=False)
+
+			if filter:
+				return [ log for log in all_logs[0].split("\n") if re.search(filter, log) ]
+
+			return all_logs
+
+
+		if log_type == "all":
+			_download_logs = ( list_logs() if which == "all" else list_logs(filter=".*[.]log$") )
+
+		else:
+			match log_type:
+				case "Access":
+					filter_for_type = "JSSAccess"
+				case "ChangeManagement":
+					filter_for_type = "JAMFChangeManagement"
+				case "SoftwareServer":
+					filter_for_type = "JAMFSoftwareServer"
+
+			_download_logs = list_logs(filter=f"{filter_for_type}.*") if which == "all" else [f"{filter_for_type}.log"]
+
+		download_logs = [ f"/usr/local/jss/logs/{log}" for log in _download_logs ]
+		self.download(file=download_logs, local_path=local_path)
 
 
 	@__which_server
