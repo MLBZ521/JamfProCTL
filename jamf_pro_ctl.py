@@ -31,8 +31,8 @@ from pydantic import BaseModel
 
 __about__ = "https://github.com/MLBZ521/JamfProCTL"
 __created__ = "4/21/2023"
-__updated__ = "4/26/2023"
-__version__ = "1.2.0"
+__updated__ = "4/27/2023"
+__version__ = "1.2.1"
 
 
 class MySQLClient():
@@ -621,7 +621,7 @@ class JamfProCTLError(Exception):
 		self.stderr = stderr
 		self.exit_status = exit_status
 		self.message = f"{TextFormat.red}{TextFormat.bold}[FAILED]{TextFormat.end} \
-			{supplemental_msg}\nExit code:  {exit_status}\n{stdout = }\n{stderr =}"
+			{supplemental_msg}\nExit code:  {exit_status}\n{stdout = }\n{stderr = }"
 		super().__init__(self.message)
 
 
@@ -641,7 +641,7 @@ class DatabaseBackupError(Exception):
 		self.stdout = stdout
 		self.stderr = stderr
 		self.exit_status = exit_status
-		self.message = f"{supplemental_msg}\n\tExit code:  {exit_status}\n\t{stdout = }\n\t{stderr =}"
+		self.message = f"{supplemental_msg}\n\tExit code:  {exit_status}\n\t{stdout = }\n\t{stderr = }"
 		super().__init__(self.message)
 
 
@@ -1126,10 +1126,10 @@ class JamfProCTL():
 				Defaults to None.
 		"""
 
-		self.__verbose__(f"Installing the Jamf Pro update on:  `{server}`")
+		self.__verbose__(f"Installing the Jamf Pro update on:  `{server.hostname}`")
 
 		stdout, stderr, exit_status = self.execute(
-			cmd = "[[ -d ./update ]] && rm -rf ./update && mkdir ./update",
+			cmd = "[[ -d ./update ]] && rm -rf ./update; mkdir ./update",
 			server = server,
 			close_ssh = False
 		)
