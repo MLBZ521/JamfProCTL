@@ -1,18 +1,27 @@
 #!/usr/bin/env python3
 
-from __future__ import annotations # Fix circular type hinting
-
 import base64
-import contextlib
 import functools
 import os
 import sys
 import re
 
+try:
+	from contextlib import nullcontext
+except:
+	from contextlib import contextmanager
+
+	class nullcontext():
+
+		@contextmanager
+		def __repr__(enter_result=None):
+			yield enter_result
+
 # For Type Hinting
 import io
 from pathlib import PurePath
-from typing import Iterable, Optional, Union
+from typing import Iterable, List, Optional, Union
+from typing_extensions import Literal
 PathTypes = Union[str, bytes, PurePath]
 
 import jasypt4py
@@ -29,10 +38,10 @@ from Cryptodome.Util import Padding
 from pydantic import BaseModel
 
 
-__about__ = "https://github.com/MLBZ521/JamfProCTL"
+__about__ = "https://github.com/MLBZ521/JamfProCTL/tree/python3.6"
 __created__ = "4/21/2023"
 __updated__ = "4/27/2023"
-__version__ = "1.2.1"
+__version__ = "1.2.1-py36"
 
 
 class MySQLClient():
@@ -43,7 +52,7 @@ class MySQLClient():
 	Can also be used as a Context Manager to interact with a MySQL database."""
 
 	def __init__(self,
-		server: DB_Server,
+		server: "DB_Server",
 		remote_bind_address: str = "127.0.0.1",
 		local_bind_address: str = "127.0.0.1",
 		dictionary: bool = True,
@@ -247,7 +256,7 @@ class SSHClient():
 
 	Can also be used as a Context Manager."""
 
-	def __init__(self, server: App_Server, verbose: bool = True):
+	def __init__(self, server: "App_Server", verbose: bool = True):
 
 		self.server = server
 		self.verbose = verbose
@@ -476,7 +485,7 @@ class SSHClient():
 
 	@__start_ssh
 	def download(
-		self, file: PathTypes | Iterable[PathTypes], local_path: PathTypes = "~/Downloads"):
+		self, file: Union[PathTypes, Iterable[PathTypes]], local_path: PathTypes = "~/Downloads"):
 		"""Download a file from remote server using SCP.
 
 		Args:
@@ -505,7 +514,7 @@ class SSHClient():
 
 
 	@__start_ssh
-	def upload(self, file: PathTypes | Iterable[PathTypes], remote_path: PathTypes = "."):
+	def upload(self, file: Union[PathTypes, Iterable[PathTypes]], remote_path: PathTypes = "."):
 		"""Upload a file or files to a remote server using SCP.
 
 		Args:
@@ -536,7 +545,7 @@ class SSHConfig(BaseModel):
 		# sshtunnel.SSHTunnelForwarder
 	look_for_keys: bool = True  # parameter for paramiko.SSHClient().connect
 	timeout: int = 10  # parameter for paramiko.SSHClient().connect & sshtunnel.SSHTunnelForwarder
-	client: Optional[SSHClient | contextlib.nullcontext]
+	client: Optional[Union[SSHClient, nullcontext]]
 
 	class Config:
 		arbitrary_types_allowed = True
@@ -570,7 +579,7 @@ class DB_Server(App_Server):
 	use_ssh: bool = True
 	allow_agent: bool = False  # parameter for sshtunnel.SSHTunnelForwarder
 	database: DatabaseConfig
-	sql: Optional[MySQLClient | contextlib.nullcontext]
+	sql: Optional[Union[MySQLClient, nullcontext]]
 
 	class Config:
 		arbitrary_types_allowed = True
@@ -581,13 +590,13 @@ class Instance(BaseModel):
 	name: str
 	api: JamfProAPI
 	Primary: App_Server
-	Secondary: Optional[list[App_Server]]
+	Secondary: Optional[List[App_Server]]
 	Database: DB_Server
 
 
 class Environment(BaseModel):
 	"""Jamf Pro Environment"""
-	Environments: list[Instance]
+	Environments: List[Instance]
 
 
 class TextFormat:
@@ -621,7 +630,7 @@ class JamfProCTLError(Exception):
 		self.stderr = stderr
 		self.exit_status = exit_status
 		self.message = f"{TextFormat.red}{TextFormat.bold}[FAILED]{TextFormat.end} \
-			{supplemental_msg}\nExit code:  {exit_status}\n{stdout = }\n{stderr = }"
+			{supplemental_msg}\nExit code:  {exit_status}\nstdout = {stdout}\nstderr = {stderr}"
 		super().__init__(self.message)
 
 
@@ -641,7 +650,8 @@ class DatabaseBackupError(Exception):
 		self.stdout = stdout
 		self.stderr = stderr
 		self.exit_status = exit_status
-		self.message = f"{supplemental_msg}\n\tExit code:  {exit_status}\n\t{stdout = }\n\t{stderr = }"
+		self.message = f"{supplemental_msg}\n\tExit code:  \
+			{exit_status}\n\tstdout = {stdout}\nstderr = {stderr}"
 		super().__init__(self.message)
 
 
@@ -744,7 +754,7 @@ class JamfProCTL():
 			config (Instance):  The configuration of an instance
 		"""
 
-		def add_tunnel(server: App_Server | DB_Server):
+		def add_tunnel(server: Union[App_Server, DB_Server]):
 			"""Helper method to add an SSHClient to each server object.
 			Also adds a Database connection instance to database objects.
 
@@ -760,29 +770,27 @@ class JamfProCTL():
 
 
 		for role, server in config:
-			match role:
+			if role == "Primary":
+				self.primary: App_Server = add_tunnel(server)
 
-				case "Primary":
-					self.primary: App_Server = add_tunnel(server)
+			elif role == "Secondary":
+				self.secondary: list[App_Server] = []
 
-				case "Secondary":
-					self.secondary: list[App_Server] = []
+				if not isinstance(server, list):
+					server = [server]
+				for _server in server:
+					self.secondary.append(add_tunnel(_server))
 
-					if not isinstance(server, list):
-						server = [server]
-					for _server in server:
-						self.secondary.append(add_tunnel(_server))
+			elif role == "Database":
 
-				case "Database":
+				self.database: DB_Server = add_tunnel(server)
 
-					self.database: DB_Server = add_tunnel(server)
-
-					# Create database connection instance
-					self.database.sql = MySQLClient(
-						self.database,
-						dictionary = True,
-						verbose = self.verbose
-					)
+				# Create database connection instance
+				self.database.sql = MySQLClient(
+					self.database,
+					dictionary = True,
+					verbose = self.verbose
+				)
 
 
 	def __which_server(func):
@@ -892,8 +900,8 @@ class JamfProCTL():
 	@__which_server
 	def download(
 		self,
-		file: PathTypes | Iterable[PathTypes],
-		server: Optional(str | App_Server | DB_Server) = None,
+		file: Union[PathTypes, Iterable[PathTypes]],
+		server: Optional[Union[str, App_Server, DB_Server]] = None,
 		local_path: PathTypes = "~/Downloads",
 		**kwargs
 	):
@@ -919,8 +927,8 @@ class JamfProCTL():
 	@__which_server
 	def upload(
 		self,
-		file: PathTypes | Iterable[PathTypes],
-		server: Optional(str | App_Server | DB_Server) = None,
+		file: Union[PathTypes, Iterable[PathTypes]],
+		server: Optional[Union[str, App_Server, DB_Server]] = None,
 		remote_path: PathTypes = ".",
 		**kwargs
 	):
@@ -943,9 +951,9 @@ class JamfProCTL():
 	@__which_server
 	def get_logs(
 		self,
-		log_type: Literal("all", "Access", "ChangeManagement", "SoftwareServer") = "SoftwareServer",
-		which: Literal("all", "latest") = "latest",
-		server: Optional(str | App_Server | DB_Server) = None,
+		log_type: Literal["all", "Access", "ChangeManagement", "SoftwareServer"] = "SoftwareServer",
+		which: Literal["all", "latest"] = "latest",
+		server: Optional[Union[str, App_Server, DB_Server]] = None,
 		local_path: PathTypes = "~/Downloads",
 		**kwargs
 	):
@@ -983,13 +991,12 @@ class JamfProCTL():
 			_download_logs = ( list_logs() if which == "all" else list_logs(filter=".*[.]log$") )
 
 		else:
-			match log_type:
-				case "Access":
-					filter_for_type = "JSSAccess"
-				case "ChangeManagement":
-					filter_for_type = "JAMFChangeManagement"
-				case "SoftwareServer":
-					filter_for_type = "JAMFSoftwareServer"
+			if log_type == "Access":
+				filter_for_type = "JSSAccess"
+			elif log_type in ("ChangeManagement", "CM"):
+				filter_for_type = "JAMFChangeManagement"
+			elif log_type in ("SoftwareServer", "JSS"):
+				filter_for_type = "JAMFSoftwareServer"
 
 			_download_logs = list_logs(filter=f"{filter_for_type}.*") if which == "all" else [f"{filter_for_type}.log"]
 
@@ -1001,7 +1008,7 @@ class JamfProCTL():
 	def execute(
 		self,
 		cmd: str,
-		server: Optional(str | App_Server | DB_Server) = None,
+		server: Optional[Union[str, App_Server, DB_Server]] = None,
 		close_ssh: bool = True
 	):
 		"""Convenience function that maps to the server objects nested execute_cmd method.
@@ -1028,7 +1035,8 @@ class JamfProCTL():
 
 
 	@__which_server
-	def start(self, server: Optional(str | App_Server | DB_Server) = None, close_ssh: bool = True):
+	def start(
+		self, server: Optional[Union[str, App_Server, DB_Server]] = None, close_ssh: bool = True):
 		"""Convenience function that starts the Jamf Pro Server Application.
 
 		Args:
@@ -1044,7 +1052,8 @@ class JamfProCTL():
 
 
 	@__which_server
-	def stop(self, server: Optional(str | App_Server | DB_Server) = None, close_ssh: bool = True):
+	def stop(
+		self, server: Optional[Union[str, App_Server, DB_Server]] = None, close_ssh: bool = True):
 		"""Convenience function that stops the Jamf Pro Server Application.
 
 		Args:
@@ -1063,7 +1072,7 @@ class JamfProCTL():
 
 	@__which_server
 	def restart(
-		self, server: Optional(str | App_Server | DB_Server) = None, close_ssh: bool = True):
+		self, server: Optional[Union[str, App_Server, DB_Server]] = None, close_ssh: bool = True):
 		"""Convenience function that restarts the Jamf Pro Server Application.
 
 		Args:
@@ -1107,7 +1116,7 @@ class JamfProCTL():
 	@__which_server
 	def install_jamf_pro(
 		self,
-		server: Optional(str | App_Server | DB_Server) = None,
+		server: Optional[Union[str, App_Server, DB_Server]] = None,
 		installer: str = "jamf-pro-installer-linux-*",
 		close_ssh: bool = True
 	):
@@ -1159,7 +1168,7 @@ class JamfProCTL():
 
 	def update(
 		self,
-		installer: PathTypes | Iterable[PathTypes] = None,
+		installer: Union[PathTypes, Iterable[PathTypes]] = None,
 		prompt_to_continue: bool = True,
 		skip_upload: bool = False
 	):
