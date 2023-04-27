@@ -61,11 +61,11 @@ jps.update(installer="~/Download/jamf-pro-installer-linux-10.45.0.zip", prompt_t
 Interactive prompts & output:
 ```
 [Verbose] Uploading the installer...
-`jps-primary.server.org`:`jamf-pro-installer-linux-10.45.0.zip` | Progress:  100.00% 
+`jps-primary.server.org`:`jamf-pro-installer-linux-10.45.0.zip` | Progress:  100.00%
 Upload(s) complete!
-`jps-2.server.org`:`jamf-pro-installer-linux-10.45.0.zip` | Progress:  100.00% 
+`jps-2.server.org`:`jamf-pro-installer-linux-10.45.0.zip` | Progress:  100.00%
 Upload(s) complete!
-`jps-3.server.org`:`jamf-pro-installer-linux-10.45.0.zip` | Progress:  100.00% 
+`jps-3.server.org`:`jamf-pro-installer-linux-10.45.0.zip` | Progress:  100.00%
 Upload(s) complete!
 
 Stop the JPS instance? [Yes|No] y
@@ -150,7 +150,7 @@ jps.dump_encrypted_tables(out="~/jamf_pro_db_decrypt/decrypted_tables")
 decrypted_string = jps.decrypt("<encrypted_string>")
 ```
 
-#### Managing open SSH/Database connections 
+#### Managing open SSH/Database connections
 
 ```python
 # Check open SSH/Database connections
@@ -164,6 +164,46 @@ SSHClient closed!
 SSHClient closed!
 Closed DB Connection!
 Closed SSH Tunnel!
+```
+
+#### Downloading Log Files
+
+```python
+# Download _all_ log files
+jps.get_logs(log_type="all", server="jps-primary.server.org")
+[Verbose] Executing Command:  `ls /usr/local/jss/logs/`
+[Verbose] `jps-primary.server.org`:`/Users/zthomps3/Downloads/backupDatabase.log` | Progress:  100.00%
+Download(s) complete!
+[Verbose] `jps-primary.server.org`:`/Users/zthomps3/Downloads/JAMFChangeManagement.log` | Progress:  100.00%
+Download(s) complete!
+[Verbose] `jps-primary.server.org`:`/Users/zthomps3/Downloads/jamf-pro-installer.log` | Progress:  100.00%
+Download(s) complete!
+[Verbose] `jps-primary.server.org`:`/Users/zthomps3/Downloads/JAMFSoftwareServer.log` | Progress:  100.00%
+Download(s) complete!
+[...]
+
+# Download all `JSSAccess.log*` files
+jps.get_logs(log_type="Access", which="all")
+[Verbose] Executing Command:  `ls /usr/local/jss/logs/`
+[Verbose] `jps-primary.server.org`:`/Users/zthomps3/Downloads/JSSAccess.log` | Progress:  100.00%
+Download(s) complete!
+[...]
+
+# Download only the latest `JAMFChangeManagement.log*` file
+jps.get_logs(log_type="ChangeManagement", which="latest")
+[Verbose] `jps-primary.server.org`:`/Users/zthomps3/Downloads/JAMFChangeManagement.log` | Progress:  100.00%
+Download(s) complete!
+
+# Download all `JAMFSoftwareServer.log*` files
+jps.get_logs(log_type="SoftwareServer", server="jps-2.server.org", which="all")
+[Verbose] Executing Command:  `ls /usr/local/jss/logs/`
+[Verbose] `jps-2.server.org`:`/Users/zthomps3/Downloads/JAMFSoftwareServer.log` | Progress:  100.00%
+Download(s) complete!
+[Verbose] `jps-2.server.org`:`/Users/zthomps3/Downloads/JAMFSoftwareServer.log.1` | Progress:  100.00%
+Download(s) complete!
+[Verbose] `jps-2.server.org`:`/Users/zthomps3/Downloads/JAMFSoftwareServer.log.10` | Progress:  100.00%
+Download(s) complete!
+[...]
 ```
 
 # Credit
