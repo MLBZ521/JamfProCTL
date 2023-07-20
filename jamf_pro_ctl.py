@@ -27,6 +27,7 @@ PathTypes = Union[str, bytes, PurePath]
 import jasypt4py
 import mysql.connector
 import paramiko
+import requests
 import scp
 import sshtunnel
 import yaml
@@ -36,6 +37,8 @@ from Cryptodome.Cipher import AES
 from Cryptodome.Util import Padding
 
 from pydantic import BaseModel
+
+from requests.exceptions import ConnectionError
 
 
 __about__ = "https://github.com/MLBZ521/JamfProCTL/tree/python3.6"
@@ -810,35 +813,34 @@ class JamfProCTL():
 		def wrap(self, *args, **kwargs):
 			"""Standard decorator function."""
 
-
-			def match_server(server: str):
-				"""Finds a server from the defined server attributes.
-
-				Args:
-					server str: A str matching a server object's hostname.
-
-				Returns:
-					(App_Server | DB_Server):  A server object.
-				"""
-
-				for jps in [ self.primary, self.database ] + self.secondary:
-					if re.match(server, jps.hostname, re.IGNORECASE):
-						return jps
-
-
 			if "server" in kwargs:
 				server = kwargs.get("server")
 				self.server = server if isinstance(server, (App_Server, DB_Server)) \
-					else match_server(server)
+					else self.__match_server(server)
 
 			elif not self.server:
-				self.server = match_server(
+				self.server = self.__match_server(
 					self.__prompt_for_input("Which server?", answer_example=""))
 
 			return func(self, *args, **kwargs)
 
 
 		return wrap
+
+
+	def __match_server(self, server: str):
+		"""Finds a server from the defined server attributes.
+
+		Args:
+			server str: A str matching a server object's hostname.
+
+		Returns:
+			(App_Server | DB_Server):  A server object.
+		"""
+
+		for jps in [ self.primary, self.database ] + self.secondary:
+			if re.match(server, jps.hostname, re.IGNORECASE):
+				return jps
 
 
 	def __check_results(self, stdout, stderr, exit_status, action):
@@ -895,6 +897,76 @@ class JamfProCTL():
 		if self.database.sql:
 			# Close database connections
 			self.database.sql.close()
+
+
+	def health_check(self, server: Optional[Union[str, App_Server, DB_Server]] = None):
+		"""Convenience function to check the health of the Jamf Pro server(s)."""
+
+		if not server:
+			servers = [self.primary] + self.secondary
+		elif isinstance(server, (App_Server, DB_Server)):
+			servers = [server]
+		else:
+			servers = self.__match_server(server)
+
+		for server in servers:
+
+			if isinstance(server, App_Server):
+
+				status = self.status(server=server)
+				stdout = (self.__remove_ansi(status[0].strip())).strip("● ")
+
+				if stdout != "running":
+					self.__verbose__(f"[WARNING] The JPS application on node `{server.hostname}` "
+						"is not running.  Attempting remediation...")
+					self.__verbose__(f"Exit Code:  `{status[2]}`")
+					self.__verbose__(f"stdout:  `{stdout}`")
+					self.__verbose__(f"stdout:  `{self.__remove_ansi(status[1]).strip()}`")
+					self.start(server=server)
+					continue
+
+				else:
+
+					try:
+						response = requests.get(
+							url=f"https://{server.hostname}:8443/healthCheck.html")
+
+						if response.status_code != 200:
+							report = response.json()[0]
+
+							if report.get("healthCode") == 2:
+								# Setup Assistant
+								self.__verbose__("[WARNING] \x1b[35;1m●\x1b[0m The node "
+									f"`{server.hostname}` is at the Setup Assistant, "
+									"this is unexpected..."
+								)
+
+							elif report.get("healthCode") == 4:
+								# Initializing
+								self.__verbose__("[NOTICE] \x1b[33;1m●\x1b[0m The node "
+									f"`{server.hostname}` is starting up.  Waiting for "
+									"node to finish..."
+								)
+
+							else:
+								self.__verbose__(f"[WARNING] \x1b[31;1m●\x1b[0m The node "
+									f"`{server.hostname}` is in poor health.  "
+									"Attempting remediation..."
+								)
+								self.__verbose__(f"Status Code:  `{response.status_code}`")
+								self.__verbose__(f"Data (json):  `{response.json()}`")
+								self.restart(server=server)
+		
+							continue
+
+					except ConnectionError as error:
+						self.__verbose__(f"[ERROR] \x1b[31;1m●\x1b[0m The node `{server.hostname}` "
+							"refused the connection.  Attempting remediation...")
+						self.start(server=server)
+						continue
+
+				self.__verbose__(f"[PASS] \x1b[32;1m●\x1b[0m `{server.hostname}` is running")
+
 
 
 	@__which_server
@@ -1028,10 +1100,27 @@ class JamfProCTL():
 
 		stdout, stderr, exit_status = self.server.ssh.client.execute_cmd(cmd)
 
-		# if self.use_ssh and close_ssh:
-		# 	self.server.tunnel.close()
+		if self.use_ssh and close_ssh:
+			self.server.tunnel.close()
 
 		return stdout, stderr, exit_status
+
+
+	@__which_server
+	def status(
+		self, server: Optional[Union[str, App_Server, DB_Server]] = None, close_ssh: bool = True):
+		"""Convenience function that checks the status of the Jamf Pro Server Application.
+
+		Args:
+			close_ssh (bool, optional):  Whether or not to close the SSH, if opened,
+				after executing command.
+				Defaults to True.
+			server (str | App_Server | DB_Server, optional):  Override the current
+				server object to execute function against.
+				Defaults to None.
+		"""
+		return self.execute(
+			cmd="sudo /usr/local/bin/jamf-pro server status", server=server, close_ssh=close_ssh)
 
 
 	@__which_server
@@ -1047,6 +1136,7 @@ class JamfProCTL():
 				server object to execute function against.
 				Defaults to None.
 		"""
+		self.__verbose__("Starting Jamf Pro...")
 		self.execute(
 			cmd="sudo /usr/local/bin/jamf-pro server start", server=server, close_ssh=close_ssh)
 
@@ -1064,7 +1154,6 @@ class JamfProCTL():
 				server object to execute function against.
 				Defaults to None.
 		"""
-
 		self.__verbose__("Stopping Jamf Pro...")
 		self.execute(
 			cmd="sudo /usr/local/bin/jamf-pro server stop", server=server, close_ssh=close_ssh)
@@ -1083,7 +1172,7 @@ class JamfProCTL():
 				server object to execute function against.
 				Defaults to None.
 		"""
-
+		self.__verbose__("Restarting Jamf Pro...")
 		self.execute(
 			cmd="sudo /usr/local/bin/jamf-pro server restart", server=server, close_ssh=close_ssh)
 
@@ -1579,3 +1668,9 @@ class JamfProCTL():
 		visual_table += f"{separator}\n"
 
 		print(visual_table)
+
+
+	def __remove_ansi(self, string: str):
+
+		ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', flags=re.IGNORECASE)
+		return ansi_escape.sub('', string)
